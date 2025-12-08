@@ -1,0 +1,74 @@
+version: '2.4'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:14-alpine
+    container_name: farmbox-db
+    environment:
+      POSTGRES_USER: farmbox
+      POSTGRES_PASSWORD: farmbox123
+      POSTGRES_DB: farmbox
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U farmbox']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis (for caching - optional)
+  redis:
+    image: redis:alpine
+    container_name: farmbox-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: farmbox-backend
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgresql://farmbox:farmbox123@db:5432/farmbox?schema=public
+      JWT_SECRET: farmbox-dev-secret-key
+      JWT_EXPIRES_IN: 7d
+      FRONTEND_URL: http://localhost:3000
+    ports:
+      - '3001:3001'
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run dev
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: farmbox-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001/api
+    ports:
+      - '3000:3000'
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  redis_data:

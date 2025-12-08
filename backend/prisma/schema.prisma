@@ -1,0 +1,301 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ ENUMS ============
+
+enum UserRole {
+  CUSTOMER
+  FARMER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum DeliveryType {
+  DELIVERY
+  PICKUP
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+}
+
+enum SubscriptionFrequency {
+  WEEKLY
+  BIWEEKLY
+}
+
+enum BoxSize {
+  SMALL
+  MEDIUM
+  LARGE
+  FAMILY
+}
+
+enum DeliveryZone {
+  ZONE_A
+  ZONE_B
+  ZONE_C
+}
+
+// ============ MODELS ============
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  phone         String?   @unique
+  passwordHash  String
+  name          String
+  role          UserRole  @default(CUSTOMER)
+
+  // Address fields
+  address       String?
+  city          String?
+  zone          DeliveryZone?
+  coordinates   Json?     // { lat: number, lng: number }
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  farm          Farm?
+  orders        Order[]
+  subscriptions Subscription[]
+  reviews       Review[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model Farm {
+  id            String    @id @default(cuid())
+  name          String
+  slug          String    @unique
+  description   String?   @db.Text
+  story         String?   @db.Text
+
+  // Location
+  address       String
+  city          String
+  coordinates   Json?     // { lat: number, lng: number }
+
+  // Contact
+  phone         String?
+  whatsapp      String?
+  email         String?
+
+  // Media
+  logo          String?
+  coverImage    String?
+  images        String[]
+
+  // Business details
+  deliveryZones DeliveryZone[]
+  isActive      Boolean   @default(true)
+  isVerified    Boolean   @default(false)
+
+  // Subscription tier
+  tier          String    @default("basic") // basic, growth, pro
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  owner         User      @relation(fields: [ownerId], references: [id])
+  ownerId       String    @unique
+  products      Product[]
+  orders        Order[]
+  subscriptions Subscription[]
+  reviews       Review[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@index([city])
+}
+
+model Product {
+  id              String    @id @default(cuid())
+  name            String
+  nameAr          String?   // Arabic name
+  description     String?   @db.Text
+
+  // Pricing
+  price           Decimal   @db.Decimal(10, 3)
+  unit            String    // kg, bunch, piece, dozen, liter
+  minQuantity     Decimal   @default(1) @db.Decimal(10, 2)
+
+  // Categorization
+  category        String    // vegetables, herbs, fruits, eggs, honey, olive-oil
+  subcategory     String?
+
+  // Availability
+  isAvailable     Boolean   @default(true)
+  seasonStart     Int?      // Month number (1-12)
+  seasonEnd       Int?      // Month number (1-12)
+  stockQuantity   Decimal?  @db.Decimal(10, 2)
+
+  // Media
+  images          String[]
+
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  farm            Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  farmId          String
+  orderItems      OrderItem[]
+
+  @@index([farmId])
+  @@index([category])
+  @@index([isAvailable])
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+
+  // Status
+  status          OrderStatus @default(PENDING)
+
+  // Delivery details
+  deliveryType    DeliveryType
+  deliveryDate    DateTime
+  deliveryWindow  String?     // "6:00-9:00", "18:00-21:00"
+  deliveryAddress String?
+  deliveryZone    DeliveryZone?
+  deliveryFee     Decimal     @default(0) @db.Decimal(10, 3)
+
+  // Pricing
+  subtotal        Decimal     @db.Decimal(10, 3)
+  total           Decimal     @db.Decimal(10, 3)
+
+  // Payment
+  paymentMethod   String      @default("cash") // cash, flouci
+  isPaid          Boolean     @default(false)
+
+  // Notes
+  customerNotes   String?     @db.Text
+  internalNotes   String?     @db.Text
+
+  // Timestamps
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  confirmedAt     DateTime?
+  deliveredAt     DateTime?
+
+  // Relations
+  customer        User        @relation(fields: [customerId], references: [id])
+  customerId      String
+  farm            Farm        @relation(fields: [farmId], references: [id])
+  farmId          String
+  items           OrderItem[]
+  subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
+  subscriptionId  String?
+
+  @@index([customerId])
+  @@index([farmId])
+  @@index([status])
+  @@index([deliveryDate])
+  @@index([orderNumber])
+}
+
+model OrderItem {
+  id          String    @id @default(cuid())
+  quantity    Decimal   @db.Decimal(10, 2)
+  unitPrice   Decimal   @db.Decimal(10, 3)
+  totalPrice  Decimal   @db.Decimal(10, 3)
+
+  // Relations
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId     String
+  product     Product   @relation(fields: [productId], references: [id])
+  productId   String
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Subscription {
+  id              String              @id @default(cuid())
+
+  // Subscription details
+  boxSize         BoxSize
+  frequency       SubscriptionFrequency
+  deliveryDay     Int                 // 0-6 (Sunday-Saturday)
+  status          SubscriptionStatus  @default(ACTIVE)
+
+  // Delivery
+  deliveryAddress String
+  deliveryZone    DeliveryZone
+
+  // Preferences
+  preferences     Json?               // { excludeItems: [], notes: "" }
+
+  // Dates
+  startDate       DateTime
+  nextDelivery    DateTime?
+  pausedUntil     DateTime?
+
+  // Timestamps
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  // Relations
+  customer        User                @relation(fields: [customerId], references: [id])
+  customerId      String
+  farm            Farm                @relation(fields: [farmId], references: [id])
+  farmId          String
+  orders          Order[]
+
+  @@index([customerId])
+  @@index([farmId])
+  @@index([status])
+}
+
+model Review {
+  id          String    @id @default(cuid())
+  rating      Int       // 1-5
+  comment     String?   @db.Text
+
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  customer    User      @relation(fields: [customerId], references: [id])
+  customerId  String
+  farm        Farm      @relation(fields: [farmId], references: [id])
+  farmId      String
+
+  @@unique([customerId, farmId])
+  @@index([farmId])
+  @@index([rating])
+}
+
+model DeliverySchedule {
+  id          String      @id @default(cuid())
+  zone        DeliveryZone
+  dayOfWeek   Int         // 0-6 (Sunday=0, Saturday=6)
+  timeWindows String[]    // ["6:00-9:00", "18:00-21:00"]
+  isActive    Boolean     @default(true)
+
+  @@unique([zone, dayOfWeek])
+}
