@@ -86,4 +86,79 @@ export const ordersApi = {
   getDeliverySchedule: () => api.get('/orders/delivery-schedule'),
 };
 
+// Subscriptions API
+export const subscriptionsApi = {
+  getMySubscriptions: () => api.get('/subscriptions/my'),
+  getById: (id: string) => api.get(`/subscriptions/${id}`),
+  create: (data: {
+    farmId: string;
+    boxSize: string;
+    frequency: string;
+    deliveryDay: number;
+    deliveryAddress: string;
+    deliveryZone: string;
+    preferences?: string;
+  }) => api.post('/subscriptions', data),
+  update: (id: string, data: any) => api.patch(`/subscriptions/${id}`, data),
+  cancel: (id: string, reason?: string) => api.delete(`/subscriptions/${id}`, { data: { reason } }),
+  pause: (id: string, data: { weeks: number; reason?: string }) =>
+    api.post(`/subscriptions/${id}/pause`, data),
+  resume: (id: string) => api.delete(`/subscriptions/${id}/pause`),
+  skip: (id: string, data: { date: string; reason?: string }) =>
+    api.post(`/subscriptions/${id}/skip`, data),
+  unskip: (id: string, date: string) => api.delete(`/subscriptions/${id}/skip/${date}`),
+};
+
+// Trial Boxes API
+export const trialApi = {
+  getAvailableFarms: (zone?: string) => api.get('/trial-boxes/available-farms', { params: { zone } }),
+  checkAvailability: (farmId: string) => api.get(`/trial-boxes/check/${farmId}`),
+  create: (data: { farmId: string; boxSize: string }) => api.post('/trial-boxes', data),
+  getMyTrialBoxes: () => api.get('/trial-boxes/my'),
+  getById: (id: string) => api.get(`/trial-boxes/${id}`),
+  convertToSubscription: (id: string, data: {
+    frequency: string;
+    deliveryDay: number;
+    deliveryAddress: string;
+    deliveryZone: string;
+    preferences?: string;
+  }) => api.post(`/trial-boxes/${id}/convert`, data),
+};
+
+// Quality & Credits API
+export const qualityApi = {
+  createReport: (data: {
+    orderId: string;
+    productId?: string;
+    issueType: string;
+    description: string;
+    photoUrls?: string[];
+  }) => api.post('/quality/reports', data),
+  getMyReports: () => api.get('/quality/reports/my'),
+  getReportById: (id: string) => api.get(`/quality/reports/${id}`),
+  getMyCredits: () => api.get('/quality/credits/my'),
+  getCreditHistory: () => api.get('/quality/credits/history'),
+  submitSurvey: (data: {
+    orderId: string;
+    overallRating: number;
+    freshnessRating: number;
+    deliveryRating: number;
+    packagingRating: number;
+    wouldRecommend: boolean;
+    feedback?: string;
+  }) => api.post('/quality/surveys', data),
+  getMySurveys: () => api.get('/quality/surveys/my'),
+  getOrdersPendingSurvey: () => api.get('/quality/surveys/pending'),
+};
+
+// Notifications API
+export const notificationsApi = {
+  getAll: (params?: { limit?: number; offset?: number }) =>
+    api.get('/notifications', { params }),
+  markAsRead: (id: string) => api.patch(`/notifications/${id}/read`),
+  markAllAsRead: () => api.patch('/notifications/read-all'),
+  getPreferences: () => api.get('/notifications/preferences'),
+  updatePreferences: (data: any) => api.patch('/notifications/preferences', data),
+};
+
 export default api;

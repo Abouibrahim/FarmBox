@@ -53,6 +53,128 @@ enum DeliveryZone {
   ZONE_C
 }
 
+// ============ NEW ENUMS FOR ENGAGEMENT FEATURES ============
+
+enum TrialStatus {
+  PENDING
+  ORDERED
+  DELIVERED
+  CONVERTED
+  EXPIRED
+}
+
+enum QualityIssue {
+  DAMAGED
+  NOT_FRESH
+  WRONG_ITEM
+  MISSING_ITEM
+  QUANTITY_SHORT
+  TASTE_QUALITY
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED
+  REJECTED
+}
+
+enum CreditReason {
+  QUALITY_ISSUE
+  PACKAGING_RETURN
+  REFERRAL
+  LOYALTY
+  APOLOGY
+  PROMOTION
+}
+
+enum NotificationType {
+  ORDER_CONFIRMED
+  ORDER_PREPARING
+  ORDER_OUT_FOR_DELIVERY
+  ORDER_DELIVERED
+  ORDER_CANCELLED
+  SUBSCRIPTION_REMINDER
+  SUBSCRIPTION_PAUSED
+  SUBSCRIPTION_RESUMED
+  DELIVERY_APPROACHING
+  QUALITY_REPORT_UPDATE
+  CREDIT_AWARDED
+  PROMOTION
+  FARM_UPDATE
+  SEASONAL_ALERT
+}
+
+enum NotificationChannel {
+  IN_APP
+  SMS
+  WHATSAPP
+  EMAIL
+  PUSH
+}
+
+enum RouteStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum StopStatus {
+  PENDING
+  ARRIVED
+  DELIVERED
+  FAILED
+  SKIPPED
+}
+
+enum TrackingStatus {
+  ORDER_PLACED
+  ORDER_CONFIRMED
+  BEING_PACKED
+  OUT_FOR_DELIVERY
+  NEARBY
+  DELIVERED
+  PICKUP_READY
+  PICKED_UP
+}
+
+enum TunisianRegion {
+  CAP_BON
+  SAHEL
+  SOUTH
+  NORTH
+  CENTRAL
+  TUNIS_SUBURBS
+}
+
+enum QualityGrade {
+  A_PLUS
+  A
+  B
+}
+
+enum RescueReason {
+  COSMETIC_IMPERFECTION
+  SURPLUS
+  NEAR_EXPIRY
+  SIZE_VARIATION
+}
+
+enum LoyaltyTier {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+enum ReferralStatus {
+  PENDING
+  COMPLETED
+  EXPIRED
+}
+
 // ============ MODELS ============
 
 model User {
@@ -69,6 +191,11 @@ model User {
   zone          DeliveryZone?
   coordinates   Json?     // { lat: number, lng: number }
 
+  // New engagement fields
+  whatsappNumber    String?
+  preferredLanguage String   @default("fr") // "fr" or "ar"
+  lastActiveAt      DateTime?
+
   // Timestamps
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -78,6 +205,21 @@ model User {
   orders        Order[]
   subscriptions Subscription[]
   reviews       Review[]
+
+  // New engagement relations
+  trialBoxes            TrialBox[]
+  qualityReports        QualityReport[]
+  customerCredits       CustomerCredit[]
+  deliverySurveys       DeliverySurvey[]
+  notifications         Notification[]
+  notificationPrefs     NotificationPreference?
+  whatsappMessages      WhatsAppMessage[]
+  customerImpact        CustomerImpact?
+  packagingReturns      PackagingReturn[]
+  customerLoyalty       CustomerLoyalty?
+  referralsMade         Referral[] @relation("Referrer")
+  referredBy            Referral[] @relation("Referred")
+  driverRoutes          DeliveryRoute[] @relation("DriverRoutes")
 
   @@index([email])
   @@index([role])
@@ -113,6 +255,12 @@ model Farm {
   // Subscription tier
   tier          String    @default("basic") // basic, growth, pro
 
+  // New engagement fields
+  region              TunisianRegion?
+  sustainabilityScore Int?     @default(0) // 0-100
+  avgDeliveryRating   Float?
+  totalFoodSavedKg    Float    @default(0)
+
   // Timestamps
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -124,6 +272,12 @@ model Farm {
   orders        Order[]
   subscriptions Subscription[]
   reviews       Review[]
+
+  // New engagement relations
+  trialBoxes        TrialBox[]
+  rescuedProduce    RescuedProduce[]
+  farmProfile       FarmProfile?
+  deliveryRoutes    DeliveryRoute[]
 
   @@index([slug])
   @@index([isActive])
@@ -154,6 +308,12 @@ model Product {
   // Media
   images          String[]
 
+  // New engagement fields
+  isRescued           Boolean  @default(false)
+  rescueDiscount      Int?     // Percentage discount
+  harvestRegion       TunisianRegion?
+  traceabilityEnabled Boolean  @default(false)
+
   // Timestamps
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -162,6 +322,10 @@ model Product {
   farm            Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
   farmId          String
   orderItems      OrderItem[]
+
+  // New engagement relations
+  batches         ProductBatch[]
+  qualityReports  QualityReport[]
 
   @@index([farmId])
   @@index([category])
@@ -195,6 +359,13 @@ model Order {
   customerNotes   String?     @db.Text
   internalNotes   String?     @db.Text
 
+  // New engagement fields
+  estimatedDeliveryTime DateTime?
+  actualDeliveryTime    DateTime?
+  deliveryInstructions  String?
+  isRescueBox           Boolean  @default(false)
+  creditsUsed           Float    @default(0)
+
   // Timestamps
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -209,6 +380,16 @@ model Order {
   items           OrderItem[]
   subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
   subscriptionId  String?
+
+  // New engagement relations
+  deliveryStop      DeliveryStop?
+  pickupPoint       PickupPoint?  @relation(fields: [pickupPointId], references: [id])
+  pickupPointId     String?
+  deliveryTracking  DeliveryTracking[]
+  impactMetrics     ImpactMetrics?
+  qualityReports    QualityReport[]
+  deliverySurvey    DeliverySurvey?
+  trialBox          TrialBox?
 
   @@index([customerId])
   @@index([farmId])
@@ -254,6 +435,15 @@ model Subscription {
   nextDelivery    DateTime?
   pausedUntil     DateTime?
 
+  // New flexibility fields
+  pausesUsedThisYear   Int      @default(0)
+  maxPausesPerYear     Int      @default(4)
+  skipsThisMonth       Int      @default(0)
+  maxSkipsPerMonth     Int      @default(2)
+  autoRenew            Boolean  @default(true)
+  reminderDaysBefore   Int      @default(2)
+  trialConverted       Boolean  @default(false)
+
   // Timestamps
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
@@ -264,6 +454,10 @@ model Subscription {
   farm            Farm                @relation(fields: [farmId], references: [id])
   farmId          String
   orders          Order[]
+
+  // New flexibility relations
+  pauses          SubscriptionPause[]
+  skips           SubscriptionSkip[]
 
   @@index([customerId])
   @@index([farmId])
@@ -298,4 +492,395 @@ model DeliverySchedule {
   isActive    Boolean     @default(true)
 
   @@unique([zone, dayOfWeek])
+}
+
+// ============ SUBSCRIPTION FLEXIBILITY MODELS ============
+
+model SubscriptionPause {
+  id              String       @id @default(cuid())
+  subscriptionId  String
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  startDate       DateTime
+  endDate         DateTime
+  reason          String?
+  createdAt       DateTime     @default(now())
+
+  @@index([subscriptionId])
+}
+
+model SubscriptionSkip {
+  id              String       @id @default(cuid())
+  subscriptionId  String
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  skipDate        DateTime
+  reason          String?
+  createdAt       DateTime     @default(now())
+
+  @@unique([subscriptionId, skipDate])
+  @@index([subscriptionId])
+}
+
+model TrialBox {
+  id              String       @id @default(cuid())
+  customerId      String
+  customer        User         @relation(fields: [customerId], references: [id])
+  farmId          String
+  farm            Farm         @relation(fields: [farmId], references: [id])
+  boxSize         BoxSize
+  status          TrialStatus  @default(PENDING)
+  orderId         String?      @unique
+  order           Order?       @relation(fields: [orderId], references: [id])
+  discountPercent Int          @default(25)
+  convertedToSub  Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  expiresAt       DateTime
+
+  @@unique([customerId, farmId])
+  @@index([customerId])
+  @@index([farmId])
+}
+
+// ============ QUALITY GUARANTEE MODELS ============
+
+model QualityReport {
+  id              String       @id @default(cuid())
+  orderId         String
+  order           Order        @relation(fields: [orderId], references: [id])
+  customerId      String
+  customer        User         @relation(fields: [customerId], references: [id])
+  productId       String?
+  product         Product?     @relation(fields: [productId], references: [id])
+  issueType       QualityIssue
+  description     String
+  photoUrls       String[]
+  status          ReportStatus @default(PENDING)
+  resolution      String?
+  refundAmount    Float?
+  creditAmount    Float?
+  handledBy       String?
+  handledAt       DateTime?
+  createdAt       DateTime     @default(now())
+
+  @@index([orderId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model CustomerCredit {
+  id              String       @id @default(cuid())
+  customerId      String
+  customer        User         @relation(fields: [customerId], references: [id])
+  amount          Float
+  reason          CreditReason
+  referenceId     String?
+  expiresAt       DateTime?
+  usedAt          DateTime?
+  usedInOrderId   String?
+  createdAt       DateTime     @default(now())
+
+  @@index([customerId])
+  @@index([expiresAt])
+}
+
+model DeliverySurvey {
+  id              String       @id @default(cuid())
+  orderId         String       @unique
+  order           Order        @relation(fields: [orderId], references: [id])
+  customerId      String
+  customer        User         @relation(fields: [customerId], references: [id])
+  overallRating   Int
+  freshnessRating Int
+  deliveryRating  Int
+  packagingRating Int
+  wouldRecommend  Boolean
+  feedback        String?
+  createdAt       DateTime     @default(now())
+
+  @@index([customerId])
+}
+
+// ============ NOTIFICATION MODELS ============
+
+model Notification {
+  id              String       @id @default(cuid())
+  userId          String
+  user            User         @relation(fields: [userId], references: [id])
+  type            NotificationType
+  title           String
+  titleAr         String
+  message         String
+  messageAr       String
+  data            Json?
+  channel         NotificationChannel[]
+  isRead          Boolean      @default(false)
+  readAt          DateTime?
+  createdAt       DateTime     @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model NotificationPreference {
+  id              String       @id @default(cuid())
+  userId          String       @unique
+  user            User         @relation(fields: [userId], references: [id])
+  orderUpdates    Boolean      @default(true)
+  deliveryAlerts  Boolean      @default(true)
+  promotions      Boolean      @default(true)
+  farmUpdates     Boolean      @default(true)
+  subscriptionReminders Boolean @default(true)
+  smsEnabled      Boolean      @default(true)
+  whatsappEnabled Boolean      @default(true)
+  emailEnabled    Boolean      @default(true)
+  pushEnabled     Boolean      @default(true)
+  updatedAt       DateTime     @updatedAt
+}
+
+model WhatsAppMessage {
+  id              String       @id @default(cuid())
+  userId          String
+  user            User         @relation(fields: [userId], references: [id])
+  direction       MessageDirection
+  messageType     WhatsAppMessageType
+  content         String
+  templateName    String?
+  status          MessageStatus @default(PENDING)
+  externalId      String?
+  createdAt       DateTime     @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum WhatsAppMessageType {
+  TEMPLATE
+  TEXT
+  IMAGE
+  DOCUMENT
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+// ============ DELIVERY & LOGISTICS MODELS ============
+
+model DeliveryRoute {
+  id              String       @id @default(cuid())
+  date            DateTime
+  zone            DeliveryZone
+  farmId          String
+  farm            Farm         @relation(fields: [farmId], references: [id])
+  driverId        String?
+  driver          User?        @relation("DriverRoutes", fields: [driverId], references: [id])
+  status          RouteStatus  @default(PLANNED)
+  stops           DeliveryStop[]
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([date, zone])
+  @@index([farmId])
+}
+
+model DeliveryStop {
+  id              String       @id @default(cuid())
+  routeId         String
+  route           DeliveryRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  orderId         String       @unique
+  order           Order        @relation(fields: [orderId], references: [id])
+  sequence        Int
+  estimatedTime   DateTime?
+  actualTime      DateTime?
+  status          StopStatus   @default(PENDING)
+  notes           String?
+  photoProof      String?
+  signature       String?
+
+  @@index([routeId])
+}
+
+model PickupPoint {
+  id              String       @id @default(cuid())
+  name            String
+  nameAr          String
+  address         String
+  addressAr       String
+  city            String
+  zone            DeliveryZone
+  lat             Float
+  lng             Float
+  partnerName     String
+  partnerPhone    String
+  operatingHours  Json
+  isActive        Boolean      @default(true)
+  orders          Order[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([zone])
+}
+
+model DeliveryTracking {
+  id              String       @id @default(cuid())
+  orderId         String
+  order           Order        @relation(fields: [orderId], references: [id])
+  status          TrackingStatus
+  location        Json?
+  message         String
+  messageAr       String
+  timestamp       DateTime     @default(now())
+
+  @@index([orderId])
+}
+
+// ============ SUSTAINABILITY & IMPACT MODELS ============
+
+model ImpactMetrics {
+  id              String       @id @default(cuid())
+  orderId         String       @unique
+  order           Order        @relation(fields: [orderId], references: [id])
+  foodSavedKg     Float        @default(0)
+  co2SavedKg      Float        @default(0)
+  kmFromFarm      Float        @default(0)
+  farmersSupported Int         @default(1)
+  packagingReturned Boolean    @default(false)
+  createdAt       DateTime     @default(now())
+}
+
+model CustomerImpact {
+  id              String       @id @default(cuid())
+  customerId      String       @unique
+  customer        User         @relation(fields: [customerId], references: [id])
+  totalFoodSavedKg Float       @default(0)
+  totalCo2SavedKg  Float       @default(0)
+  totalOrders      Int         @default(0)
+  totalFarmersSupported Int    @default(0)
+  packagingsReturned Int       @default(0)
+  memberSince      DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
+model RescuedProduce {
+  id              String       @id @default(cuid())
+  farmId          String
+  farm            Farm         @relation(fields: [farmId], references: [id])
+  productName     String
+  productNameAr   String
+  weightKg        Float
+  reason          RescueReason
+  discountPercent Int          @default(30)
+  availableUntil  DateTime
+  isAvailable     Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+
+  @@index([farmId])
+  @@index([availableUntil])
+}
+
+model PackagingReturn {
+  id              String       @id @default(cuid())
+  customerId      String
+  customer        User         @relation(fields: [customerId], references: [id])
+  itemsReturned   Int
+  creditAwarded   Float
+  returnedAt      DateTime     @default(now())
+
+  @@index([customerId])
+}
+
+// ============ FARM PROFILE & TRACEABILITY MODELS ============
+
+model FarmProfile {
+  id              String       @id @default(cuid())
+  farmId          String       @unique
+  farm            Farm         @relation(fields: [farmId], references: [id])
+  story           String       @db.Text
+  storyAr         String       @db.Text
+  farmingMethods  String[]
+  certifications  String[]
+  foundedYear     Int?
+  familyGeneration Int?
+  farmSize        Float?
+  specialties     String[]
+  videoUrl        String?
+  galleryImages   String[]
+  socialMedia     Json?
+  updatedAt       DateTime     @updatedAt
+}
+
+model ProductBatch {
+  id              String       @id @default(cuid())
+  productId       String
+  product         Product      @relation(fields: [productId], references: [id])
+  batchCode       String       @unique
+  harvestDate     DateTime
+  harvestLocation String?
+  farmerId        String
+  quantityKg      Float
+  qualityGrade    QualityGrade @default(A)
+  notes           String?
+  createdAt       DateTime     @default(now())
+
+  @@index([productId])
+  @@index([harvestDate])
+}
+
+model RegionalCampaign {
+  id              String       @id @default(cuid())
+  name            String
+  nameAr          String
+  region          TunisianRegion
+  description     String       @db.Text
+  descriptionAr   String       @db.Text
+  heroImage       String
+  products        String[]
+  startDate       DateTime
+  endDate         DateTime
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+
+  @@index([region])
+  @@index([startDate, endDate])
+}
+
+// ============ LOYALTY & REFERRAL MODELS ============
+
+model CustomerLoyalty {
+  id              String       @id @default(cuid())
+  customerId      String       @unique
+  customer        User         @relation(fields: [customerId], references: [id])
+  points          Int          @default(0)
+  tier            LoyaltyTier  @default(BRONZE)
+  totalSpent      Float        @default(0)
+  totalOrders     Int          @default(0)
+  referralCode    String       @unique
+  referralsCount  Int          @default(0)
+  updatedAt       DateTime     @updatedAt
+}
+
+model Referral {
+  id              String       @id @default(cuid())
+  referrerId      String
+  referrer        User         @relation("Referrer", fields: [referrerId], references: [id])
+  referredId      String
+  referred        User         @relation("Referred", fields: [referredId], references: [id])
+  status          ReferralStatus @default(PENDING)
+  rewardAmount    Float        @default(10)
+  createdAt       DateTime     @default(now())
+  completedAt     DateTime?
+
+  @@unique([referrerId, referredId])
+  @@index([referrerId])
 }

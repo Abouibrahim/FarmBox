@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/auth';
 import { ordersApi } from '@/lib/api';
 import { Order, ORDER_STATUS_LABELS } from '@/types';
 import { formatPrice, formatDate } from '@/lib/utils';
-import { Package, ShoppingBag, User, Settings, ArrowRight, Loader2 } from 'lucide-react';
+import { Package, ShoppingBag, User, Settings, ArrowRight, Loader2, Repeat, AlertCircle } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -63,6 +63,13 @@ export default function DashboardPage() {
           color="primary"
         />
         <QuickActionCard
+          icon={<Repeat className="h-6 w-6" />}
+          title="Abonnements"
+          description="Paniers hebdomadaires"
+          href="/dashboard/subscriptions"
+          color="green"
+        />
+        <QuickActionCard
           icon={<Package className="h-6 w-6" />}
           title="Mes commandes"
           description="Voir l'historique"
@@ -70,18 +77,11 @@ export default function DashboardPage() {
           color="blue"
         />
         <QuickActionCard
-          icon={<User className="h-6 w-6" />}
-          title="Mon profil"
-          description="Modifier mes infos"
-          href="/dashboard/profile"
-          color="green"
-        />
-        <QuickActionCard
-          icon={<Settings className="h-6 w-6" />}
-          title="Parametres"
-          description="Preferences"
-          href="/dashboard/settings"
-          color="gray"
+          icon={<AlertCircle className="h-6 w-6" />}
+          title="Qualite"
+          description="Signaler un probleme"
+          href="/dashboard/quality"
+          color="yellow"
         />
       </div>
 
@@ -105,7 +105,7 @@ export default function DashboardPage() {
         ) : recentOrders.length === 0 ? (
           <div className="p-8 text-center">
             <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 mb-4">Vous n'avez pas encore de commandes</p>
+            <p className="text-gray-500 mb-4">Vous n&apos;avez pas encore de commandes</p>
             <Link
               href="/farms"
               className="text-primary-600 font-medium hover:underline"
@@ -168,13 +168,14 @@ function QuickActionCard({
   title: string;
   description: string;
   href: string;
-  color: 'primary' | 'blue' | 'green' | 'gray';
+  color: 'primary' | 'blue' | 'green' | 'gray' | 'yellow';
 }) {
   const colorClasses = {
     primary: 'bg-primary-50 text-primary-600',
     blue: 'bg-blue-50 text-blue-600',
     green: 'bg-green-50 text-green-600',
     gray: 'bg-gray-50 text-gray-600',
+    yellow: 'bg-yellow-50 text-yellow-600',
   };
 
   return (
