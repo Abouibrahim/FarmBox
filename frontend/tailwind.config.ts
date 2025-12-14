@@ -9,6 +9,36 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Borgdanet Brand Colors
+        brand: {
+          green: {
+            DEFAULT: '#2D5A27',
+            light: '#4A7C43',
+            dark: '#1E3D1A',
+          },
+          gold: {
+            DEFAULT: '#D4A84B',
+            light: '#E5C77A',
+            dark: '#B8923D',
+          },
+          brown: {
+            DEFAULT: '#5C4033',
+            light: '#7A5A4A',
+            dark: '#3D2A22',
+          },
+          cream: {
+            DEFAULT: '#FDF8F0',
+            dark: '#F5EDE0',
+          },
+          terracotta: {
+            DEFAULT: '#C75B39',
+            light: '#D97B5C',
+          },
+          sky: {
+            DEFAULT: '#87CEEB',
+          },
+        },
+        // Keep legacy colors for backward compatibility
         primary: {
           50: '#f0fdf4',
           100: '#dcfce7',
@@ -35,10 +65,18 @@ const config: Config = {
         },
       },
       fontFamily: {
+        display: ['Playfair Display', 'Georgia', 'serif'],
+        body: ['Inter', 'system-ui', 'sans-serif'],
+        arabic: ['IBM Plex Sans Arabic', 'sans-serif'],
         sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'hero-pattern': "linear-gradient(rgba(45, 90, 39, 0.7), rgba(45, 90, 39, 0.5))",
       },
     },
   },
   plugins: [],
 }
+
 export default config

@@ -1,0 +1,272 @@
+{
+  "site_name": "ButcherBox",
+  "domain": "https://www.butcherbox.com",
+  "description": "Premium meat and seafood delivery subscription service",
+  "main_navigation": [
+    {
+      "label": "Home",
+      "url": "/",
+      "description": "Homepage with product showcase and value proposition"
+    },
+    {
+      "label": "Get Started",
+      "url": "/get-started",
+      "description": "Subscription signup and onboarding flow"
+    },
+    {
+      "label": "About Us",
+      "url": "/about-us",
+      "description": "Company story, founder information, and mission"
+    },
+    {
+      "label": "Shop",
+      "url": "/shop",
+      "description": "Product catalog and browsing"
+    }
+  ],
+  "page_structure": {
+    "homepage": {
+      "url": "/",
+      "title": "ButcherBox: Meat Delivery Subscription",
+      "sections": [
+        {
+          "name": "Hero Section",
+          "content": "Main value proposition with CTA 'Get Started Today'",
+          "key_message": "Better meat and seafood for the holidays"
+        },
+        {
+          "name": "Product Showcase",
+          "content": "100+ premium proteins carousel",
+          "products_featured": [
+            "100% Grass-Fed, Pasture-Raised Ribeyes",
+            "Wild-Caught Sockeye Salmon",
+            "100% Grass-Fed, Pasture-Raised New York Strips",
+            "Organic Free-Range Boneless Skinless Chicken Breasts",
+            "100% Grass-Fed, Pasture-Raised Top Sirloin Steaks",
+            "Crate-Free Boneless Pork Chops",
+            "Organic Free-Range Bone-in Chicken Thighs",
+            "Crate-Free Pork Tenderloin",
+            "Regenerative Organic Certified Ground Beef",
+            "100% Grass-Fed Ground Sirloin",
+            "Humanely-Raised Ground Turkey",
+            "Organic Free-Range Boneless Chicken Thighs",
+            "Fully Cooked Beef Barbacoa",
+            "Wild-Caught Sea Scallops",
+            "Pasture-Raised Smash Burger",
+            "100% Grass-Fed Ground Bison",
+            "Applewood Smoked Bacon",
+            "Bacon and Cheese Egg Bites",
+            "Pasture-Raised Heirloom Whole Chicken",
+            "Boneless Skinless Chicken Breast - Individually Wrapped",
+            "Wild-Caught Cod",
+            "Fully Cooked Diced Chicken Breast",
+            "Twin Lobster Tails",
+            "Crate-Free Center-Cut Pork Loin Roast"
+          ]
+        },
+        {
+          "name": "Subscription Offer",
+          "content": "Subscribe & Save promotion with free protein offer",
+          "cta": "Get your choice of FREE steak in every box for a year"
+        },
+        {
+          "name": "Superior Standards Section",
+          "content": "Four key differentiators with imagery",
+          "standards": [
+            "Clean protein you can trust - No antibiotics or added hormones",
+            "Practices that prioritize animals - Humanely-raised meat",
+            "Methods that protect marine health - 100% sustainably harvested seafood",
+            "Meat that raises the bar - Free of 200+ banned ingredients"
+          ]
+        },
+        {
+          "name": "How It Works",
+          "content": "3-step process explanation",
+          "steps": [
+            "Pick your plan - Choose curated boxes or customize",
+            "Build your box - Select preferred cuts",
+            "Get it delivered for free - Receive within 1-3 days"
+          ]
+        },
+        {
+          "name": "Key Features",
+          "content": "Subscription benefits highlight",
+          "features": [
+            "Flexible Subscription",
+            "Skip or Cancel Anytime",
+            "Free Shipping",
+            "100% Satisfaction Guarantee",
+            "Third-Party Certified for Animal Welfare",
+            "No Antibiotics Ever"
+          ]
+        },
+        {
+          "name": "Membership Value",
+          "content": "Benefits of membership",
+          "benefits": [
+            "Best Prices - Up to 15% savings vs. grocery stores",
+            "Weekly Deals - Exclusive member perks",
+            "Sizzle Perks - Loyalty points program"
+          ]
+        },
+        {
+          "name": "Competitor Comparison",
+          "content": "Comparison table with Good Chop, Good Ranchers, Omaha Steaks",
+          "comparison_metrics": [
+            "Pricing",
+            "Free Shipping",
+            "Customization",
+            "Satisfaction Guarantee",
+            "Loyalty Program",
+            "Animal Welfare Certification",
+            "Shipping Cost"
+          ]
+        },
+        {
+          "name": "Customer Testimonial",
+          "content": "5-star review from customer",
+          "testimonial": "I love that I can receive all of the meat my family consumes right to my doorstep"
+        },
+        {
+          "name": "About Section",
+          "content": "Founder story and company mission",
+          "cta": "Read Our Story link to /about-us"
+        },
+        {
+          "name": "FAQ Section",
+          "content": "Common questions about service, sourcing, and guarantees",
+          "topics": [
+            "Product sourcing and sourcing practices",
+            "Shipping and freshness guarantee",
+            "Satisfaction guarantee policy",
+            "Subscription flexibility"
+          ]
+        }
+      ]
+    },
+    "about_us": {
+      "url": "/about-us",
+      "title": "About Us",
+      "sections": [
+        {
+          "name": "Company Story",
+          "content": "Founder Mike Salguero's journey and motivation"
+        },
+        {
+          "name": "Mission Statement",
+          "content": "Make high-quality, humanely raised meat more accessible"
+        },
+        {
+          "name": "Key Revelations",
+          "points": [
+            "The taste is better - Grass-fed beef quality",
+            "The current system isn't working - Need for better accessibility"
+          ]
+        }
+      ]
+    },
+    "get_started": {
+      "url": "/get-started",
+      "title": "Get Started - ButcherBox Subscription",
+      "description": "Signup and onboarding flow for new customers"
+    }
+  },
+  "product_categories": [
+    {
+      "category": "Beef",
+      "types": [
+        "Grass-Fed Ribeyes",
+        "Grass-Fed New York Strips",
+        "Grass-Fed Top Sirloin Steaks",
+        "Grass-Fed Ground Beef",
+        "Grass-Fed Ground Sirloin",
+        "Grass-Fed Ground Bison",
+        "Beef Barbacoa"
+      ]
+    },
+    {
+      "category": "Poultry",
+      "types": [
+        "Organic Free-Range Chicken Breasts",
+        "Organic Free-Range Chicken Thighs",
+        "Humanely-Raised Ground Turkey",
+        "Pasture-Raised Whole Chicken",
+        "Diced Chicken Breast"
+      ]
+    },
+    {
+      "category": "Pork",
+      "types": [
+        "Crate-Free Boneless Pork Chops",
+        "Crate-Free Pork Tenderloin",
+        "Crate-Free Pork Loin Roast",
+        "Applewood Smoked Bacon",
+        "Bacon and Cheese Egg Bites"
+      ]
+    },
+    {
+      "category": "Seafood",
+      "types": [
+        "Wild-Caught Sockeye Salmon",
+        "Wild-Caught Sea Scallops",
+        "Wild-Caught Cod",
+        "Twin Lobster Tails"
+      ]
+    },
+    {
+      "category": "Specialty",
+      "types": [
+        "Smash Burger",
+        "Prepared Foods",
+        "Specialty Meats"
+      ]
+    }
+  ],
+  "key_features": {
+    "subscription_model": {
+      "description": "Flexible subscription service",
+      "box_sizes": [
+        "6 products",
+        "12 products"
+      ],
+      "customization": "Fully customizable selections",
+      "frequency": "Flexible delivery schedule",
+      "cancellation": "Skip or cancel anytime"
+    },
+    "sourcing": {
+      "beef": "100% grass-fed and grass-finished from Australia or pasture-raised grain-finished from US",
+      "poultry": "Organic free-range, humanely raised",
+      "pork": "Crate-free, humanely raised",
+      "seafood": "Wild-caught from American coastlines or responsibly farmed",
+      "certifications": "B-Corp certified, third-party animal welfare certifications"
+    },
+    "pricing": {
+      "range": "$10.50-$15 per pound",
+      "comparison": "Up to 15% savings vs. grocery stores",
+      "shipping": "Free shipping included",
+      "promotions": "Free protein offers for new subscribers"
+    },
+    "guarantees": {
+      "satisfaction": "100% Satisfaction Guarantee",
+      "freshness": "Frozen to lock in freshness with calculated dry ice",
+      "delivery": "1-3 day delivery window"
+    }
+  },
+  "call_to_actions": [
+    {
+      "text": "Get Started Today",
+      "url": "/get-started",
+      "location": "Hero section"
+    },
+    {
+      "text": "Choose ButcherBox",
+      "url": "/get-started",
+      "location": "Comparison section"
+    },
+    {
+      "text": "Read Our Story",
+      "url": "/about-us",
+      "location": "About section"
+    }
+  ]
+}

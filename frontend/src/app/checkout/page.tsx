@@ -1,386 +1,264 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useCartStore } from '@/store/cart';
 import { useAuthStore } from '@/store/auth';
-import { ordersApi } from '@/lib/api';
-import { DELIVERY_ZONES, DeliveryZone } from '@/types';
-import { formatPrice, getDeliveryFee, getNextDeliveryDate, getDayName } from '@/lib/utils';
-import {
-  MapPin,
-  Calendar,
-  Truck,
-  Store,
-  ArrowLeft,
-  CheckCircle,
-  AlertCircle,
-  Loader2,
-} from 'lucide-react';
+import { useCartStore } from '@/store/cart';
+import { unifiedOrdersApi } from '@/lib/api';
+import { CheckoutDelivery } from '@/components/checkout/CheckoutDelivery';
+import { CheckoutPayment } from '@/components/checkout/CheckoutPayment';
+import { CheckoutSummary } from '@/components/checkout/CheckoutSummary';
 
-export default function CheckoutPage() {
+type DeliveryType = 'delivery' | 'pickup';
+type PaymentMethod = 'flouci' | 'cash';
+
+const deliveryFees: Record<string, { fee: number; freeThreshold: number }> = {
+  ZONE_A: { fee: 5, freeThreshold: 80 },
+  ZONE_B: { fee: 8, freeThreshold: 120 },
+  ZONE_C: { fee: 12, freeThreshold: 150 },
+};
+
+function CheckoutPageContent() {
   const router = useRouter();
-  const { items, getSubtotal, getFarmIds, getItemsByFarm, clearFarmItems } = useCartStore();
+  const searchParams = useSearchParams();
   const { user, isAuthenticated } = useAuthStore();
+  const { items, getSubtotal, getItemsGroupedByFarm, clearCart } = useCartStore();
+
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
-  const [createdOrders, setCreatedOrders] = useState<any[]>([]);
 
-  const [deliveryType, setDeliveryType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
-  const [deliveryZone, setDeliveryZone] = useState<DeliveryZone>(
-    (user?.zone as DeliveryZone) || 'ZONE_A'
-  );
-  const [deliveryAddress, setDeliveryAddress] = useState(user?.address || '');
-  const [deliveryWindow, setDeliveryWindow] = useState('6:00-9:00');
-  const [customerNotes, setCustomerNotes] = useState('');
+  const [deliveryType, setDeliveryType] = useState<DeliveryType>('delivery');
+  const [zone, setZone] = useState(searchParams.get('zone') || 'ZONE_B');
+  const [deliveryDay, setDeliveryDay] = useState('thursday');
+  const [timeSlot, setTimeSlot] = useState('evening');
+  const [pickupPointId, setPickupPointId] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [acceptTerms, setAcceptTerms] = useState(false);
+
+  const [address, setAddress] = useState({
+    street: '',
+    city: '',
+    postalCode: '',
+    phone: '',
+  });
 
   useEffect(() => {
     setMounted(true);
-    if (!isAuthenticated) {
-      router.push('/login?redirect=/checkout');
-    }
-  }, [isAuthenticated, router]);
+  }, []);
 
-  if (!mounted || !isAuthenticated) {
+  useEffect(() => {
+    if (mounted && !isAuthenticated) {
+      router.push(`/login?redirect=/checkout?zone=${zone}`);
+    }
+  }, [mounted, isAuthenticated, router, zone]);
+
+  useEffect(() => {
+    if (mounted && items.length === 0) {
+      router.push('/cart');
+    }
+  }, [mounted, items, router]);
+
+  if (!mounted) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+      <main className="min-h-screen bg-brand-cream py-8">
+        <div className="container mx-auto px-4 max-w-6xl">
+          <div className="animate-pulse">
+            <div className="h-8 bg-brand-cream-dark rounded w-64 mb-8" />
+            <div className="grid lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 space-y-6">
+                <div className="h-64 bg-white rounded-lg" />
+                <div className="h-48 bg-white rounded-lg" />
+              </div>
+              <div className="h-96 bg-white rounded-lg" />
+            </div>
+          </div>
         </div>
-      </div>
+      </main>
     );
   }
 
-  if (items.length === 0 && !success) {
-    router.push('/cart');
+  if (!isAuthenticated || items.length === 0) {
     return null;
   }
 
-  const farmIds = getFarmIds();
   const subtotal = getSubtotal();
-  const deliveryFee = deliveryType === 'DELIVERY' ? getDeliveryFee(deliveryZone, subtotal) : 0;
-  const total = subtotal + deliveryFee * farmIds.length;
-  const nextDeliveryDate = getNextDeliveryDate(deliveryZone);
+  const zoneConfig = deliveryFees[zone];
+  const deliveryFee = deliveryType === 'pickup' ? 0 :
+    (subtotal >= zoneConfig.freeThreshold ? 0 : zoneConfig.fee);
+  const total = subtotal + deliveryFee;
+
+  const itemsByFarm = getItemsGroupedByFarm();
+
+  // Calculate next delivery date based on selected day
+  const getNextDeliveryDate = () => {
+    const dayMap: Record<string, number> = { tuesday: 2, thursday: 4, saturday: 6 };
+    const targetDay = dayMap[deliveryDay];
+    const today = new Date();
+    const daysUntilDelivery = (targetDay - today.getDay() + 7) % 7 || 7;
+    const deliveryDate = new Date(today);
+    deliveryDate.setDate(today.getDate() + daysUntilDelivery);
+    return deliveryDate;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
 
-    if (deliveryType === 'DELIVERY' && !deliveryAddress) {
-      setError('Veuillez entrer une adresse de livraison');
+    if (!acceptTerms) {
+      setError('Veuillez accepter les conditions générales de vente');
+      return;
+    }
+
+    if (deliveryType === 'delivery' && (!address.street || !address.city || !address.phone)) {
+      setError('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    if (deliveryType === 'pickup' && !pickupPointId) {
+      setError('Veuillez sélectionner un point de retrait');
       return;
     }
 
     setLoading(true);
+    setError('');
 
     try {
-      const orders = [];
+      const deliveryDate = getNextDeliveryDate();
+      const deliveryWindow = timeSlot === 'morning' ? '6:00-9:00' : '18:00-21:00';
 
-      // Create an order for each farm
-      for (const farmId of farmIds) {
-        const farmItems = getItemsByFarm(farmId);
-        const orderData = {
-          farmId,
-          items: farmItems.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-          })),
-          deliveryType,
-          deliveryDate: nextDeliveryDate.toISOString(),
-          deliveryWindow,
-          deliveryAddress: deliveryType === 'DELIVERY' ? deliveryAddress : undefined,
-          deliveryZone: deliveryType === 'DELIVERY' ? deliveryZone : undefined,
-          customerNotes,
-        };
+      const orderData = {
+        items: items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+        })),
+        deliveryType: deliveryType === 'delivery' ? 'DELIVERY' : 'PICKUP',
+        deliveryDate: deliveryDate.toISOString(),
+        deliveryWindow,
+        deliveryAddress: deliveryType === 'delivery'
+          ? `${address.street}, ${address.postalCode} ${address.city}`
+          : undefined,
+        deliveryZone: deliveryType === 'delivery' ? zone : undefined,
+        customerNotes: `Tel: ${address.phone}`,
+      };
 
-        const response = await ordersApi.create(orderData);
-        orders.push(response.data);
+      const response = await unifiedOrdersApi.create(orderData);
 
-        // Clear this farm's items from cart
-        clearFarmItems(farmId);
-      }
-
-      setCreatedOrders(orders);
-      setSuccess(true);
-    } catch (err: any) {
+      clearCart();
+      router.push(`/orders/${response.data.id}/confirmation`);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue';
+      setError(errorMessage);
       console.error('Checkout error:', err);
-      setError(
-        err.response?.data?.error || 'Erreur lors de la commande. Veuillez reessayer.'
-      );
     } finally {
       setLoading(false);
     }
   };
 
-  if (success) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <CheckCircle className="h-10 w-10 text-green-600" />
-        </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">
-          Commande confirmee!
-        </h1>
-        <p className="text-gray-600 mb-6">
-          Merci pour votre commande. Vous recevrez une confirmation par email.
-        </p>
-
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-8 text-left">
-          <h2 className="font-semibold mb-4">Details de la commande</h2>
-          {createdOrders.map((order) => (
-            <div key={order.id} className="border-b last:border-0 pb-4 mb-4 last:mb-0 last:pb-0">
-              <div className="flex justify-between mb-2">
-                <span className="text-gray-600">N° de commande:</span>
-                <span className="font-medium">{order.orderNumber}</span>
-              </div>
-              <div className="flex justify-between mb-2">
-                <span className="text-gray-600">Ferme:</span>
-                <span className="font-medium">{order.farm.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Total:</span>
-                <span className="font-semibold text-primary-600">
-                  {formatPrice(Number(order.total))}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link
-            href="/dashboard/orders"
-            className="bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition"
-          >
-            Voir mes commandes
-          </Link>
-          <Link
-            href="/farms"
-            className="bg-white text-primary-600 px-6 py-3 rounded-lg font-medium border-2 border-primary-600 hover:bg-primary-50 transition"
-          >
-            Continuer mes achats
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <Link
-          href="/cart"
-          className="inline-flex items-center text-gray-600 hover:text-primary-600 mb-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Retour au panier
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Finaliser la commande</h1>
-      </div>
-
-      {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-6 flex items-center">
-          <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="grid md:grid-cols-3 gap-8">
-        {/* Delivery Options */}
-        <div className="md:col-span-2 space-y-6">
-          {/* Delivery Type */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="font-semibold text-lg mb-4">Mode de livraison</h2>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <label
-                className={`border-2 rounded-lg p-4 cursor-pointer transition ${
-                  deliveryType === 'DELIVERY'
-                    ? 'border-primary-600 bg-primary-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="deliveryType"
-                  value="DELIVERY"
-                  checked={deliveryType === 'DELIVERY'}
-                  onChange={(e) => setDeliveryType('DELIVERY')}
-                  className="sr-only"
-                />
-                <Truck className="h-6 w-6 text-primary-600 mb-2" />
-                <p className="font-medium">Livraison a domicile</p>
-                <p className="text-sm text-gray-500">
-                  {deliveryFee > 0
-                    ? `${deliveryFee} TND par ferme`
-                    : 'Gratuite pour cette commande'}
-                </p>
-              </label>
-
-              <label
-                className={`border-2 rounded-lg p-4 cursor-pointer transition ${
-                  deliveryType === 'PICKUP'
-                    ? 'border-primary-600 bg-primary-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="deliveryType"
-                  value="PICKUP"
-                  checked={deliveryType === 'PICKUP'}
-                  onChange={(e) => setDeliveryType('PICKUP')}
-                  className="sr-only"
-                />
-                <Store className="h-6 w-6 text-primary-600 mb-2" />
-                <p className="font-medium">Retrait a la ferme</p>
-                <p className="text-sm text-gray-500">Gratuit</p>
-              </label>
-            </div>
-          </div>
-
-          {/* Delivery Details */}
-          {deliveryType === 'DELIVERY' && (
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="font-semibold text-lg mb-4">Adresse de livraison</h2>
-
-              {/* Zone */}
-              <div className="mb-4">
-                <label className="label block mb-1">Zone de livraison</label>
-                <select
-                  value={deliveryZone}
-                  onChange={(e) => setDeliveryZone(e.target.value as DeliveryZone)}
-                  className="input w-full"
-                >
-                  {Object.entries(DELIVERY_ZONES).map(([key, zone]) => (
-                    <option key={key} value={key}>
-                      {zone.nameFr} - {zone.cities.join(', ')}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Address */}
-              <div className="mb-4">
-                <label className="label block mb-1">Adresse complete</label>
-                <textarea
-                  value={deliveryAddress}
-                  onChange={(e) => setDeliveryAddress(e.target.value)}
-                  className="input w-full h-24 resize-none"
-                  placeholder="Numero, rue, quartier, code postal..."
-                  required
-                />
-              </div>
-
-              {/* Time Window */}
-              <div>
-                <label className="label block mb-1">Creneau horaire</label>
-                <select
-                  value={deliveryWindow}
-                  onChange={(e) => setDeliveryWindow(e.target.value)}
-                  className="input w-full"
-                >
-                  <option value="6:00-9:00">Matin (6h - 9h)</option>
-                  <option value="18:00-21:00">Soir (18h - 21h)</option>
-                </select>
-              </div>
-            </div>
-          )}
-
-          {/* Delivery Date */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="font-semibold text-lg mb-4">Date de livraison</h2>
-            <div className="flex items-center text-gray-600">
-              <Calendar className="h-5 w-5 mr-2" />
-              <span>
-                {getDayName(nextDeliveryDate.getDay())}{' '}
-                {nextDeliveryDate.toLocaleDateString('fr-TN', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })}
-              </span>
-            </div>
-            <p className="text-sm text-gray-500 mt-2">
-              Commandez avant dimanche soir pour la prochaine livraison
-            </p>
-          </div>
-
-          {/* Notes */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="font-semibold text-lg mb-4">Notes (optionnel)</h2>
-            <textarea
-              value={customerNotes}
-              onChange={(e) => setCustomerNotes(e.target.value)}
-              className="input w-full h-24 resize-none"
-              placeholder="Instructions speciales, allergies, preferences..."
-            />
-          </div>
+    <main className="min-h-screen bg-brand-cream py-8">
+      <div className="container mx-auto px-4 max-w-6xl">
+        {/* Header */}
+        <div className="mb-8">
+          <Link
+            href="/cart"
+            className="text-brand-brown hover:text-brand-green transition-colors inline-flex items-center mb-4"
+          >
+            ← Retour au panier
+          </Link>
+          <h1 className="font-display text-3xl text-brand-green">
+            Finaliser ma commande
+          </h1>
         </div>
 
-        {/* Summary */}
-        <div className="md:col-span-1">
-          <div className="bg-white rounded-xl shadow-sm p-6 sticky top-24">
-            <h2 className="font-semibold text-lg mb-4">Resume</h2>
+        <form onSubmit={handleSubmit}>
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* Left Column - Forms */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Delivery Section */}
+              <CheckoutDelivery
+                deliveryType={deliveryType}
+                onDeliveryTypeChange={setDeliveryType}
+                zone={zone}
+                onZoneChange={setZone}
+                deliveryDay={deliveryDay}
+                onDeliveryDayChange={setDeliveryDay}
+                timeSlot={timeSlot}
+                onTimeSlotChange={setTimeSlot}
+                pickupPointId={pickupPointId}
+                onPickupPointChange={setPickupPointId}
+                address={address}
+                onAddressChange={setAddress}
+              />
 
-            {/* Items */}
-            <div className="space-y-3 mb-4">
-              {items.map((item) => (
-                <div key={item.productId} className="flex justify-between text-sm">
-                  <span className="text-gray-600">
-                    {item.productName} x{item.quantity}
+              {/* Payment Section */}
+              <CheckoutPayment
+                paymentMethod={paymentMethod}
+                onPaymentMethodChange={setPaymentMethod}
+              />
+
+              {/* Terms */}
+              <div className="bg-white rounded-lg p-6">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acceptTerms}
+                    onChange={(e) => setAcceptTerms(e.target.checked)}
+                    className="mt-1 w-5 h-5 rounded border-brand-cream-dark text-brand-green focus:ring-brand-green"
+                  />
+                  <span className="text-sm text-brand-brown">
+                    J&apos;accepte les{' '}
+                    <Link href="/terms" className="text-brand-green underline">
+                      conditions générales de vente
+                    </Link>{' '}
+                    et la{' '}
+                    <Link href="/privacy" className="text-brand-green underline">
+                      politique de confidentialité
+                    </Link>
                   </span>
-                  <span>{formatPrice(item.price * item.quantity)}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="border-t pt-4 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Sous-total</span>
-                <span>{formatPrice(subtotal)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Livraison</span>
-                <span>
-                  {deliveryFee > 0
-                    ? formatPrice(deliveryFee * farmIds.length)
-                    : 'Gratuite'}
-                </span>
+                </label>
               </div>
             </div>
 
-            <div className="border-t mt-4 pt-4">
-              <div className="flex justify-between text-lg">
-                <span className="font-semibold">Total</span>
-                <span className="font-bold text-primary-600">{formatPrice(total)}</span>
-              </div>
+            {/* Right Column - Summary */}
+            <div className="lg:col-span-1">
+              <CheckoutSummary
+                itemsByFarm={itemsByFarm}
+                subtotal={subtotal}
+                deliveryFee={deliveryFee}
+                total={total}
+                deliveryType={deliveryType}
+                zone={zone}
+                loading={loading}
+                error={error}
+              />
             </div>
+          </div>
+        </form>
+      </div>
+    </main>
+  );
+}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition mt-6 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                  Traitement...
-                </>
-              ) : (
-                'Confirmer la commande'
-              )}
-            </button>
-
-            <p className="text-xs text-gray-500 text-center mt-4">
-              Paiement a la livraison (especes)
-            </p>
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-brand-cream py-8">
+        <div className="container mx-auto px-4 max-w-6xl">
+          <div className="animate-pulse">
+            <div className="h-8 bg-brand-cream-dark rounded w-64 mb-8" />
+            <div className="grid lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 space-y-6">
+                <div className="h-64 bg-white rounded-lg" />
+                <div className="h-48 bg-white rounded-lg" />
+              </div>
+              <div className="h-96 bg-white rounded-lg" />
+            </div>
           </div>
         </div>
-      </form>
-    </div>
+      </main>
+    }>
+      <CheckoutPageContent />
+    </Suspense>
   );
 }

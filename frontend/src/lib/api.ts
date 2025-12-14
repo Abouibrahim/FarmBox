@@ -1,10 +1,13 @@
 import axios from 'axios';
 
+// Always use relative /api path - this gets proxied to the backend
+// This works both in development and production, and avoids CORS issues
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000, // 30 second timeout
 });
 
 // Request interceptor to add auth token
@@ -72,7 +75,40 @@ export const productsApi = {
   getMyProducts: () => api.get('/products/me/products'),
 };
 
-// Orders API
+// Product Discovery API (Product-First Experience)
+export const productDiscoveryApi = {
+  getFeatured: (limit?: number) => api.get('/products/featured', { params: { limit } }),
+  getPopular: (params?: { limit?: number; category?: string }) =>
+    api.get('/products/popular', { params }),
+  getSeasonal: (params?: { limit?: number; category?: string }) =>
+    api.get('/products/seasonal', { params }),
+  search: (params: {
+    q?: string;
+    category?: string;
+    priceMin?: number;
+    priceMax?: number;
+    farmId?: string;
+    sort?: 'relevance' | 'price_asc' | 'price_desc' | 'newest' | 'popularity';
+    limit?: number;
+    offset?: number;
+  }) => api.get('/products/search', { params }),
+  getByCategory: (slug: string, params?: {
+    sort?: string;
+    limit?: number;
+    offset?: number;
+    priceMin?: number;
+    priceMax?: number;
+    farmId?: string;
+  }) => api.get(`/products/category/${slug}`, { params }),
+  getByFarm: (farmId: string, params?: { excludeId?: string; limit?: number }) =>
+    api.get(`/products/farm/${farmId}`, { params }),
+  getSimilar: (id: string, limit?: number) =>
+    api.get(`/products/${id}/similar`, { params: { limit } }),
+  recordView: (id: string) => api.post(`/products/${id}/view`),
+  recordCartAdd: (id: string) => api.post(`/products/${id}/cart-add`),
+};
+
+// Orders API (Legacy - single farm orders)
 export const ordersApi = {
   create: (data: any) => api.post('/orders', data),
   getMyOrders: (params?: { status?: string; limit?: number; offset?: number }) =>
@@ -84,6 +120,25 @@ export const ordersApi = {
   updateStatus: (id: string, status: string) =>
     api.patch(`/orders/${id}/status`, { status }),
   getDeliverySchedule: () => api.get('/orders/delivery-schedule'),
+};
+
+// Unified Orders API (Multi-farm orders)
+export const unifiedOrdersApi = {
+  create: (data: {
+    items: Array<{ productId: string; quantity: number }>;
+    deliveryType: 'DELIVERY' | 'PICKUP';
+    deliveryDate: string;
+    deliveryWindow?: string;
+    deliveryAddress?: string;
+    deliveryZone?: string;
+    customerNotes?: string;
+    creditsToUse?: number;
+  }) => api.post('/orders/unified', data),
+  getMyOrders: (params?: { status?: string; limit?: number; offset?: number }) =>
+    api.get('/orders/unified/my', { params }),
+  getById: (id: string) => api.get(`/orders/unified/${id}`),
+  getByNumber: (orderNumber: string) => api.get(`/orders/unified/number/${orderNumber}`),
+  cancel: (id: string, reason?: string) => api.patch(`/orders/unified/${id}/cancel`, { reason }),
 };
 
 // Subscriptions API
@@ -159,6 +214,39 @@ export const notificationsApi = {
   markAllAsRead: () => api.patch('/notifications/read-all'),
   getPreferences: () => api.get('/notifications/preferences'),
   updatePreferences: (data: any) => api.patch('/notifications/preferences', data),
+};
+
+// Category Subscriptions API (Multi-farm category boxes)
+export const categorySubscriptionsApi = {
+  getCategories: () => api.get('/category-subscriptions/categories'),
+  create: (data: {
+    category: string;
+    boxSize: 'SMALL' | 'MEDIUM' | 'LARGE' | 'FAMILY';
+    frequency: 'WEEKLY' | 'BIWEEKLY';
+    deliveryDay: number;
+    deliveryAddress: string;
+    deliveryZone: string;
+    preferences?: {
+      excludeItems?: string[];
+      preferredFarms?: string[];
+      notes?: string;
+    };
+    maxFarmsPerBox?: number;
+    startDate?: string;
+  }) => api.post('/category-subscriptions', data),
+  getMy: () => api.get('/category-subscriptions/my'),
+  getById: (id: string) => api.get(`/category-subscriptions/${id}`),
+  update: (id: string, data: any) => api.patch(`/category-subscriptions/${id}`, data),
+  cancel: (id: string, reason?: string) =>
+    api.delete(`/category-subscriptions/${id}`, { data: { reason } }),
+  pause: (id: string, data: { startDate: string; endDate: string; reason?: string }) =>
+    api.post(`/category-subscriptions/${id}/pause`, data),
+  resume: (id: string) => api.delete(`/category-subscriptions/${id}/pause`),
+  skip: (id: string, data: { skipDate: string; reason?: string }) =>
+    api.post(`/category-subscriptions/${id}/skip`, data),
+  unskip: (id: string, date: string) =>
+    api.delete(`/category-subscriptions/${id}/skip/${date}`),
+  previewNextBox: (id: string) => api.get(`/category-subscriptions/${id}/preview`),
 };
 
 export default api;

@@ -3,16 +3,22 @@ import { persist } from 'zustand/middleware';
 
 export interface CartItem {
   productId: string;
-  productName: string;
+  productName?: string;
+  name?: string; // Alias for productName (used by new product pages)
   productNameAr?: string;
   farmId: string;
   farmName: string;
-  farmSlug: string;
+  farmSlug?: string;
   price: number;
   unit: string;
   quantity: number;
   image?: string;
 }
+
+// Helper to get display name from cart item
+export const getItemDisplayName = (item: CartItem): string => {
+  return item.productName || item.name || 'Unknown Product';
+};
 
 interface CartStore {
   items: CartItem[];
@@ -25,6 +31,7 @@ interface CartStore {
   getItemCount: () => number;
   getFarmIds: () => string[];
   getItemsByFarm: (farmId: string) => CartItem[];
+  getItemsGroupedByFarm: () => Record<string, CartItem[]>;
 }
 
 export const useCartStore = create<CartStore>()(
@@ -92,6 +99,18 @@ export const useCartStore = create<CartStore>()(
 
       getItemsByFarm: (farmId) => {
         return get().items.filter((i) => i.farmId === farmId);
+      },
+
+      getItemsGroupedByFarm: () => {
+        const items = get().items;
+        return items.reduce((grouped, item) => {
+          const farmId = item.farmId;
+          if (!grouped[farmId]) {
+            grouped[farmId] = [];
+          }
+          grouped[farmId].push(item);
+          return grouped;
+        }, {} as Record<string, CartItem[]>);
       },
     }),
     {

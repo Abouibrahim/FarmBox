@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth';
-import { subscriptionsApi, trialApi } from '@/lib/api';
+import { subscriptionsApi, trialApi, categorySubscriptionsApi } from '@/lib/api';
 import { Subscription, TrialBox, SUBSCRIPTION_STATUS_LABELS, BOX_SIZES, DAYS_OF_WEEK } from '@/types';
 import { formatDate, formatPrice } from '@/lib/utils';
 import {
@@ -19,12 +19,37 @@ import {
   Gift,
   ChevronRight,
   Plus,
+  Leaf,
 } from 'lucide-react';
+
+const CATEGORIES: Record<string, { name: string; emoji: string }> = {
+  vegetables: { name: 'Legumes', emoji: '🥬' },
+  fruits: { name: 'Fruits', emoji: '🍎' },
+  herbs: { name: 'Herbes aromatiques', emoji: '🌿' },
+  eggs: { name: 'Oeufs', emoji: '🥚' },
+  honey: { name: 'Miel', emoji: '🍯' },
+  'olive-oil': { name: "Huile d'olive", emoji: '🫒' },
+  dairy: { name: 'Produits laitiers', emoji: '🧀' },
+  mixed: { name: 'Box Mixte', emoji: '📦' },
+};
+
+const CATEGORY_BOX_SIZES: Record<string, string> = {
+  SMALL: 'Petite',
+  MEDIUM: 'Moyenne',
+  LARGE: 'Grande',
+};
+
+const FREQUENCIES_FR: Record<string, string> = {
+  WEEKLY: 'Hebdomadaire',
+  BIWEEKLY: 'Bi-hebdomadaire',
+  MONTHLY: 'Mensuel',
+};
 
 export default function SubscriptionsPage() {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [categorySubscriptions, setCategorySubscriptions] = useState<any[]>([]);
   const [trialBoxes, setTrialBoxes] = useState<TrialBox[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -40,12 +65,20 @@ export default function SubscriptionsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [subsResponse, trialsResponse] = await Promise.all([
+      const [subsResponse, categorySubsResponse, trialsResponse] = await Promise.allSettled([
         subscriptionsApi.getMySubscriptions(),
+        categorySubscriptionsApi.getMy(),
         trialApi.getMyTrialBoxes(),
       ]);
-      setSubscriptions(subsResponse.data.data || []);
-      setTrialBoxes(trialsResponse.data.data || []);
+      if (subsResponse.status === 'fulfilled') {
+        setSubscriptions(subsResponse.value.data.data || []);
+      }
+      if (categorySubsResponse.status === 'fulfilled') {
+        setCategorySubscriptions(categorySubsResponse.value.data || []);
+      }
+      if (trialsResponse.status === 'fulfilled') {
+        setTrialBoxes(trialsResponse.value.data.data || []);
+      }
     } catch (error) {
       console.error('Failed to load subscriptions:', error);
     } finally {
@@ -63,19 +96,19 @@ export default function SubscriptionsPage() {
       <div className="mb-8">
         <Link
           href="/dashboard"
-          className="inline-flex items-center text-gray-600 hover:text-primary-600 mb-4"
+          className="inline-flex items-center text-brand-brown hover:text-brand-green mb-4 transition-colors"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Retour au tableau de bord
         </Link>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Mes abonnements</h1>
-            <p className="text-gray-600">Gerez vos paniers hebdomadaires</p>
+            <h1 className="font-display text-2xl text-brand-green">Mes abonnements</h1>
+            <p className="text-brand-brown">Gérez vos paniers hebdomadaires</p>
           </div>
           <Link
-            href="/trial"
-            className="btn-primary flex items-center gap-2"
+            href="/get-started"
+            className="bg-brand-green text-white px-4 py-2 rounded-lg hover:bg-brand-green-dark transition-colors flex items-center gap-2 font-medium"
           >
             <Plus className="h-4 w-4" />
             Nouvel abonnement
@@ -85,15 +118,15 @@ export default function SubscriptionsPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+          <Loader2 className="h-8 w-8 animate-spin text-brand-green" />
         </div>
       ) : (
         <>
           {/* Trial Boxes */}
           {trialBoxes.length > 0 && (
             <div className="mb-8">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Gift className="h-5 w-5 text-primary-600" />
+              <h2 className="text-lg font-semibold text-brand-green mb-4 flex items-center gap-2">
+                <Gift className="h-5 w-5 text-brand-gold" />
                 Paniers d&apos;essai
               </h2>
               <div className="space-y-4">
@@ -104,12 +137,28 @@ export default function SubscriptionsPage() {
             </div>
           )}
 
-          {/* Active Subscriptions */}
+          {/* Category Subscriptions */}
+          {categorySubscriptions.length > 0 && (
+            <div className="space-y-4 mb-8">
+              <h2 className="text-lg font-semibold text-brand-green flex items-center gap-2">
+                <Leaf className="h-5 w-5 text-brand-green" />
+                Abonnements par catégorie
+              </h2>
+              {categorySubscriptions.map((catSub) => (
+                <CategorySubscriptionCard
+                  key={catSub.id}
+                  subscription={catSub}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Farm Subscriptions */}
           {subscriptions.length > 0 ? (
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Package className="h-5 w-5 text-primary-600" />
-                Abonnements actifs
+              <h2 className="text-lg font-semibold text-brand-green flex items-center gap-2">
+                <Package className="h-5 w-5 text-brand-green" />
+                Abonnements ferme
               </h2>
               {subscriptions.map((subscription) => (
                 <SubscriptionCard
@@ -119,16 +168,21 @@ export default function SubscriptionsPage() {
                 />
               ))}
             </div>
-          ) : trialBoxes.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-              <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="font-medium text-gray-900 mb-2">Aucun abonnement</h3>
-              <p className="text-gray-500 mb-6">
+          ) : trialBoxes.length === 0 && categorySubscriptions.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm p-8 text-center border border-brand-cream-dark">
+              <div className="w-16 h-16 bg-brand-cream rounded-full flex items-center justify-center mx-auto mb-4">
+                <Package className="h-8 w-8 text-brand-brown/50" />
+              </div>
+              <h3 className="font-display text-xl text-brand-green mb-2">Aucun abonnement</h3>
+              <p className="text-brand-brown mb-6">
                 Recevez des produits frais chaque semaine avec nos paniers bio
               </p>
-              <Link href="/trial" className="btn-primary inline-flex items-center gap-2">
-                <Gift className="h-4 w-4" />
-                Essayer un panier (-25%)
+              <Link
+                href="/get-started"
+                className="bg-brand-green text-white px-6 py-3 rounded-lg hover:bg-brand-green-dark transition-colors inline-flex items-center gap-2 font-medium"
+              >
+                <Calendar className="h-4 w-4" />
+                Créer un abonnement
               </Link>
             </div>
           ) : null}
@@ -437,5 +491,67 @@ function SubscriptionCard({
         )}
       </div>
     </div>
+  );
+}
+
+function CategorySubscriptionCard({ subscription }: { subscription: any }) {
+  const category = CATEGORIES[subscription.category] || CATEGORIES.mixed;
+  const isPaused = subscription.status === 'PAUSED';
+  const isCancelled = subscription.status === 'CANCELLED';
+  const isActive = subscription.status === 'ACTIVE';
+
+  return (
+    <Link
+      href={`/subscriptions/category/${subscription.id}`}
+      className="block bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition"
+    >
+      <div className="p-4 flex items-center gap-4">
+        {/* Category Icon */}
+        <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">
+          {category.emoji}
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-semibold text-gray-900">
+              Box {category.name}
+            </h3>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              isCancelled ? 'bg-red-100 text-red-800' :
+              isPaused ? 'bg-yellow-100 text-yellow-800' :
+              'bg-green-100 text-green-800'
+            }`}>
+              {isCancelled ? 'Annule' : isPaused ? 'En pause' : 'Actif'}
+            </span>
+          </div>
+          <p className="text-sm text-gray-600">
+            {CATEGORY_BOX_SIZES[subscription.boxSize] || subscription.boxSize} - {FREQUENCIES_FR[subscription.frequency] || subscription.frequency}
+          </p>
+        </div>
+
+        {/* Next Delivery */}
+        <div className="text-right hidden sm:block">
+          {isActive && subscription.nextDelivery && (
+            <div>
+              <p className="text-xs text-gray-500">Prochaine livraison</p>
+              <p className="font-medium text-primary-600">
+                {formatDate(subscription.nextDelivery)}
+              </p>
+            </div>
+          )}
+          {isPaused && subscription.pausedUntil && (
+            <div className="flex items-center gap-1 text-yellow-600">
+              <Pause className="h-4 w-4" />
+              <span className="text-sm">
+                Jusqu&apos;au {formatDate(subscription.pausedUntil)}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
+      </div>
+    </Link>
   );
 }

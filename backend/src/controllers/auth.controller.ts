@@ -19,6 +19,26 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Email, password, and name are required' });
     }
 
+    // Validate email format (BUG-003 fix)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    // Validate password length (BUG-004 fix)
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    // Validate phone format if provided (BUG-006 fix - Tunisia phone numbers)
+    if (phone) {
+      const phoneRegex = /^(\+216)?[0-9]{8}$/;
+      const cleanPhone = phone.replace(/\s/g, '');
+      if (!phoneRegex.test(cleanPhone)) {
+        return res.status(400).json({ error: 'Invalid phone format. Use 8 digits or +216 followed by 8 digits' });
+      }
+    }
+
     // Check if user exists
     const existingUser = await prisma.user.findFirst({
       where: {
@@ -189,6 +209,11 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: 'Current and new password are required' });
+    }
+
+    // Validate new password length (BUG-004 fix)
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
     }
 
     const user = await prisma.user.findUnique({

@@ -221,6 +221,10 @@ model User {
   referredBy            Referral[] @relation("Referred")
   driverRoutes          DeliveryRoute[] @relation("DriverRoutes")
 
+  // Product-first relations
+  customerOrders        CustomerOrder[]
+  categorySubscriptions CategorySubscription[]
+
   @@index([email])
   @@index([role])
 }
@@ -323,6 +327,10 @@ model Product {
   farmId          String
   orderItems      OrderItem[]
 
+  // Product-first relations
+  popularity      ProductPopularity?
+  featuredIn      FeaturedProduct[]
+
   // New engagement relations
   batches         ProductBatch[]
   qualityReports  QualityReport[]
@@ -381,6 +389,10 @@ model Order {
   subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
   subscriptionId  String?
 
+  // Product-first: Link to unified CustomerOrder (this Order becomes a sub-order)
+  customerOrder   CustomerOrder? @relation("CustomerOrderSubOrders", fields: [customerOrderId], references: [id])
+  customerOrderId String?
+
   // New engagement relations
   deliveryStop      DeliveryStop?
   pickupPoint       PickupPoint?  @relation(fields: [pickupPointId], references: [id])
@@ -396,6 +408,7 @@ model Order {
   @@index([status])
   @@index([deliveryDate])
   @@index([orderNumber])
+  @@index([customerOrderId])
 }
 
 model OrderItem {
@@ -492,6 +505,145 @@ model DeliverySchedule {
   isActive    Boolean     @default(true)
 
   @@unique([zone, dayOfWeek])
+}
+
+// ============ PRODUCT-FIRST & UNIFIED ORDERS MODELS ============
+
+model CustomerOrder {
+  id              String       @id @default(cuid())
+  orderNumber     String       @unique
+  customerId      String
+  customer        User         @relation(fields: [customerId], references: [id])
+
+  // Delivery details
+  deliveryType    DeliveryType
+  deliveryDate    DateTime
+  deliveryWindow  String?
+  deliveryAddress String?
+  deliveryZone    DeliveryZone?
+
+  // Pricing
+  subtotal        Decimal      @db.Decimal(10, 3)
+  deliveryFee     Decimal      @db.Decimal(10, 3)
+  creditsUsed     Decimal      @default(0) @db.Decimal(10, 3)
+  total           Decimal      @db.Decimal(10, 3)
+
+  // Payment
+  paymentMethod   String       @default("cash")
+  isPaid          Boolean      @default(false)
+
+  // Status (aggregate of sub-orders)
+  status          OrderStatus  @default(PENDING)
+
+  // Notes
+  customerNotes   String?      @db.Text
+
+  // Timestamps
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relations - sub-orders (farm-specific orders)
+  subOrders       Order[]      @relation("CustomerOrderSubOrders")
+
+  @@index([customerId])
+  @@index([status])
+  @@index([orderNumber])
+}
+
+model ProductPopularity {
+  id            String   @id @default(cuid())
+  productId     String   @unique
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  viewCount     Int      @default(0)
+  orderCount    Int      @default(0)
+  cartAddCount  Int      @default(0)
+  score         Float    @default(0)  // Calculated: (orderCount * 0.5) + (cartAddCount * 0.3) + (viewCount * 0.2)
+  updatedAt     DateTime @updatedAt
+
+  @@index([score])
+}
+
+model FeaturedProduct {
+  id            String    @id @default(cuid())
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  position      Int       @default(0)
+  featuredUntil DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+
+  @@index([isActive, position])
+}
+
+// ============ CATEGORY SUBSCRIPTION MODELS ============
+
+model CategorySubscription {
+  id                  String              @id @default(cuid())
+  customerId          String
+  customer            User                @relation(fields: [customerId], references: [id])
+
+  // Category configuration
+  category            String              // vegetables, fruits, herbs, etc.
+  boxSize             BoxSize
+  frequency           SubscriptionFrequency
+  deliveryDay         Int                 // 0-6 (Sunday-Saturday)
+
+  // Delivery
+  deliveryAddress     String
+  deliveryZone        DeliveryZone
+
+  // Preferences
+  preferences         Json?               // { excludeItems: [], preferredFarms: [], notes: "" }
+  maxFarmsPerBox      Int                 @default(3)
+
+  // Status
+  status              SubscriptionStatus  @default(ACTIVE)
+  startDate           DateTime
+  nextDelivery        DateTime?
+  pausedUntil         DateTime?
+
+  // Flexibility
+  pausesUsedThisYear  Int      @default(0)
+  maxPausesPerYear    Int      @default(4)
+  skipsThisMonth      Int      @default(0)
+  maxSkipsPerMonth    Int      @default(2)
+  autoRenew           Boolean  @default(true)
+
+  // Timestamps
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  pauses              CategorySubscriptionPause[]
+  skips               CategorySubscriptionSkip[]
+
+  @@index([customerId])
+  @@index([category])
+  @@index([status])
+}
+
+model CategorySubscriptionPause {
+  id              String               @id @default(cuid())
+  subscriptionId  String
+  subscription    CategorySubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  startDate       DateTime
+  endDate         DateTime
+  reason          String?
+  createdAt       DateTime             @default(now())
+
+  @@index([subscriptionId])
+}
+
+model CategorySubscriptionSkip {
+  id              String               @id @default(cuid())
+  subscriptionId  String
+  subscription    CategorySubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  skipDate        DateTime
+  reason          String?
+  createdAt       DateTime             @default(now())
+
+  @@unique([subscriptionId, skipDate])
+  @@index([subscriptionId])
 }
 
 // ============ SUBSCRIPTION FLEXIBILITY MODELS ============

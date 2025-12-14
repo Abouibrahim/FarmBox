@@ -1,186 +1,256 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Leaf, Truck, Heart, MapPin, ShoppingBag, Users, Calendar } from 'lucide-react';
+import { Plus } from 'lucide-react';
+import { productDiscoveryApi, productsApi } from '@/lib/api';
+import { useCartStore } from '@/store/cart';
+
+// Import new Borgdanet components
+import { TrustBar } from '@/components/brand/TrustBar';
+import { HeroSection } from '@/components/home/HeroSection';
+import { HowItWorks } from '@/components/home/HowItWorks';
+import { CategoryGrid } from '@/components/home/CategoryGrid';
+import { FarmCarousel } from '@/components/home/FarmCarousel';
+import { SubscriptionOptions } from '@/components/home/SubscriptionOptions';
+import { StandardsSection } from '@/components/home/StandardsSection';
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  unit: string;
+  category: string;
+  images: string[];
+  isAvailable: boolean;
+  farm: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+}
+
+const CATEGORY_ICONS: Record<string, string> = {
+  vegetables: '🥬',
+  fruits: '🍎',
+  herbs: '🌿',
+  eggs: '🥚',
+  honey: '🍯',
+  'olive-oil': '🫒',
+  dairy: '🧀',
+  other: '📦',
+};
 
 export default function HomePage() {
+  const [seasonalProducts, setSeasonalProducts] = useState<Product[]>([]);
+  const [popularProducts, setPopularProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { addItem } = useCartStore();
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [seasonalRes, popularRes] = await Promise.all([
+        productDiscoveryApi.getSeasonal({ limit: 4 }),
+        productDiscoveryApi.getPopular({ limit: 4 }),
+      ]);
+      setSeasonalProducts(seasonalRes.data);
+      setPopularProducts(popularRes.data);
+    } catch (error) {
+      console.log('Products will load from API when available');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddToCart = async (product: Product) => {
+    addItem({
+      productId: product.id,
+      name: product.name,
+      price: product.price,
+      unit: product.unit,
+      farmId: product.farm.id,
+      farmName: product.farm.name,
+      image: product.images[0],
+    }, 1);
+    try {
+      await productDiscoveryApi.recordCartAdd(product.id);
+    } catch (error) { /* silently fail */ }
+  };
+
   return (
     <>
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-primary-50 via-white to-primary-100 py-20 overflow-hidden">
-        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-5" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-          <div className="text-center max-w-3xl mx-auto">
-            <span className="inline-block bg-primary-100 text-primary-700 text-sm font-medium px-4 py-1 rounded-full mb-6">
-              Produits bio de Tunisie
-            </span>
-            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-              Du champ a votre table,{' '}
-              <span className="text-primary-600">en toute fraicheur</span>
-            </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-              Decouvrez les produits frais et bio de nos fermes tunisiennes.
-              Commandez en ligne et recevez votre panier chaque semaine.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href="/farms"
-                className="bg-primary-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-primary-700 transition inline-flex items-center justify-center"
-              >
-                <ShoppingBag className="mr-2 h-5 w-5" />
-                Decouvrir nos fermes
-              </Link>
-              <Link
-                href="#how-it-works"
-                className="bg-white text-primary-600 px-8 py-3 rounded-lg text-lg font-semibold border-2 border-primary-600 hover:bg-primary-50 transition"
-              >
-                Comment ca marche
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+      <HeroSection />
 
-      {/* Features Section */}
-      <section className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Pourquoi choisir FarmBox?
-            </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Nous connectons directement les agriculteurs locaux aux consommateurs pour des produits plus frais et un commerce plus equitable.
-            </p>
-          </div>
-          <div className="grid md:grid-cols-4 gap-8">
-            <FeatureCard
-              icon={<Leaf className="h-8 w-8" />}
-              title="100% Bio"
-              description="Produits cultives sans pesticides ni engrais chimiques"
-            />
-            <FeatureCard
-              icon={<MapPin className="h-8 w-8" />}
-              title="Local"
-              description="Fermes a moins de 50km de Tunis"
-            />
-            <FeatureCard
-              icon={<Truck className="h-8 w-8" />}
-              title="Livraison fraiche"
-              description="Recolte et livre en moins de 48h"
-            />
-            <FeatureCard
-              icon={<Heart className="h-8 w-8" />}
-              title="Soutien local"
-              description="Soutenez directement nos agriculteurs"
-            />
-          </div>
-        </div>
-      </section>
+      {/* Trust Bar */}
+      <TrustBar />
 
       {/* How It Works */}
-      <section id="how-it-works" className="py-16 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <HowItWorks />
+
+      {/* Category Grid */}
+      <CategoryGrid />
+
+      {/* Farm Carousel */}
+      <FarmCarousel />
+
+      {/* Subscription Options */}
+      <SubscriptionOptions />
+
+      {/* Seasonal Products */}
+      {seasonalProducts.length > 0 && (
+        <section className="py-16 bg-brand-cream">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <span className="inline-flex items-center bg-brand-green/10 text-brand-green text-sm px-3 py-1 rounded-full mb-2">
+                  🍊 Cette saison
+                </span>
+                <h2 className="font-display text-3xl text-brand-green">
+                  Produits de saison
+                </h2>
+              </div>
+              <Link
+                href="/products?seasonal=true"
+                className="text-brand-green hover:text-brand-green-dark font-medium flex items-center"
+              >
+                Voir tous →
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
+              {seasonalProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onAddToCart={() => handleAddToCart(product)}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Standards Section */}
+      <StandardsSection />
+
+      {/* Popular Products */}
+      {popularProducts.length > 0 && (
+        <section className="py-16 bg-white">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="font-display text-3xl text-brand-green">
+                Populaires cette semaine
+              </h2>
+              <Link
+                href="/products?sort=popularity"
+                className="text-brand-green hover:text-brand-green-dark font-medium flex items-center"
+              >
+                Voir tous →
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
+              {popularProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onAddToCart={() => handleAddToCart(product)}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Impact Section */}
+      <section className="py-16 bg-brand-green text-white">
+        <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Comment ca marche?
+            <h2 className="font-display text-3xl lg:text-4xl mb-4">
+              Notre impact collectif
             </h2>
-            <p className="text-gray-600">
-              Commander vos produits frais en 3 etapes simples
+            <p className="text-white/80 max-w-2xl mx-auto">
+              Ensemble, nous changeons le système alimentaire tunisien
             </p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            <StepCard
-              number="1"
-              icon={<Users className="h-6 w-6" />}
-              title="Choisissez une ferme"
-              description="Parcourez nos fermes partenaires et decouvrez leurs produits de saison"
-            />
-            <StepCard
-              number="2"
-              icon={<ShoppingBag className="h-6 w-6" />}
-              title="Composez votre panier"
-              description="Selectionnez vos produits preferes ou optez pour un abonnement hebdomadaire"
-            />
-            <StepCard
-              number="3"
-              icon={<Calendar className="h-6 w-6" />}
-              title="Recevez votre commande"
-              description="Livraison a domicile ou retrait a la ferme selon votre preference"
-            />
-          </div>
-        </div>
-      </section>
 
-      {/* Zones Section */}
-      <section className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Zones de livraison
-            </h2>
-            <p className="text-gray-600">
-              Nous livrons dans toute la region du Grand Tunis
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white/10 rounded-2xl p-6 text-center">
+              <p className="text-4xl font-bold mb-2">45+</p>
+              <p className="text-white/80">Fermes partenaires</p>
+            </div>
+            <div className="bg-white/10 rounded-2xl p-6 text-center">
+              <p className="text-4xl font-bold mb-2">12,500</p>
+              <p className="text-white/80">Familles servies</p>
+            </div>
+            <div className="bg-white/10 rounded-2xl p-6 text-center">
+              <p className="text-4xl font-bold mb-2">850kg</p>
+              <p className="text-white/80">Nourriture sauvée</p>
+            </div>
+            <div className="bg-white/10 rounded-2xl p-6 text-center">
+              <p className="text-4xl font-bold mb-2">15T</p>
+              <p className="text-white/80">CO2 évité</p>
+            </div>
+          </div>
+
+          <div className="bg-white/10 rounded-2xl p-6 max-w-2xl mx-auto text-center">
+            <p className="text-lg">
+              💚 Cette semaine: 245 familles ont reçu leur box, représentant 890 TND versés directement aux fermes
             </p>
           </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            <ZoneCard
-              zone="Zone A"
-              cities={['Tunis', 'La Marsa', 'Carthage', 'Sidi Bou Said']}
-              fee="5 TND"
-              freeFrom="80 TND"
-              color="primary"
-            />
-            <ZoneCard
-              zone="Zone B"
-              cities={['Ariana', 'Ben Arous', 'Manouba']}
-              fee="8 TND"
-              freeFrom="120 TND"
-              color="secondary"
-            />
-            <ZoneCard
-              zone="Zone C"
-              cities={['Banlieue exterieure']}
-              fee="12 TND"
-              freeFrom="150 TND"
-              color="gray"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-16 bg-primary-600">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
-            Pret a commander?
-          </h2>
-          <p className="text-primary-100 mb-8 text-lg max-w-2xl mx-auto">
-            Inscrivez-vous gratuitement et recevez 10% de reduction sur votre premiere commande
-          </p>
-          <Link
-            href="/register"
-            className="bg-white text-primary-600 px-8 py-3 rounded-lg text-lg font-semibold hover:bg-primary-50 transition inline-block"
-          >
-            Creer un compte gratuit
-          </Link>
         </div>
       </section>
 
       {/* Farmer CTA */}
-      <section className="py-16 bg-secondary-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="py-16 bg-brand-cream">
+        <div className="container mx-auto px-4">
           <div className="bg-white rounded-2xl shadow-lg p-8 md:p-12 flex flex-col md:flex-row items-center justify-between">
-            <div className="mb-6 md:mb-0">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                Vous etes producteur?
-              </h3>
-              <p className="text-gray-600">
-                Rejoignez notre plateforme et vendez directement aux consommateurs de Tunis
-              </p>
+            <div className="mb-6 md:mb-0 flex items-center gap-6">
+              <span className="text-5xl">🌾</span>
+              <div>
+                <h3 className="font-display text-2xl text-brand-green mb-2">
+                  Vous êtes producteur?
+                </h3>
+                <p className="text-brand-brown">
+                  Rejoignez notre réseau de fermes partenaires et vendez directement aux familles
+                </p>
+              </div>
             </div>
             <Link
               href="/register?role=farmer"
-              className="bg-secondary-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-secondary-600 transition whitespace-nowrap"
+              className="whitespace-nowrap px-6 py-3 bg-brand-green text-white font-semibold rounded-lg hover:bg-brand-green-dark transition"
             >
-              Devenir partenaire
+              Devenir partenaire →
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="py-16 bg-white">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="font-display text-3xl lg:text-4xl text-brand-green mb-4">
+            Prêt à manger local?
+          </h2>
+          <p className="text-brand-brown text-lg mb-8 max-w-2xl mx-auto">
+            Commencez votre aventure avec Borgdanet et découvrez le goût des produits
+            cultivés avec soin par nos fermiers tunisiens.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link
+              href="/get-started"
+              className="inline-flex items-center justify-center px-8 py-4 bg-brand-green text-white font-semibold rounded-lg hover:bg-brand-green-dark transition text-lg"
+            >
+              Commencer maintenant
+            </Link>
+            <Link
+              href="/products"
+              className="inline-flex items-center justify-center px-8 py-4 bg-brand-cream text-brand-green font-semibold rounded-lg border-2 border-brand-green hover:bg-brand-green hover:text-white transition text-lg"
+            >
+              Explorer les produits
             </Link>
           </div>
         </div>
@@ -189,81 +259,58 @@ export default function HomePage() {
   );
 }
 
-function FeatureCard({
-  icon,
-  title,
-  description,
+// Product Card Component
+function ProductCard({
+  product,
+  onAddToCart,
 }: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
+  product: Product;
+  onAddToCart: () => void;
 }) {
-  return (
-    <div className="text-center p-6 rounded-xl hover:bg-gray-50 transition">
-      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-100 text-primary-600 mb-4">
-        {icon}
-      </div>
-      <h3 className="text-xl font-semibold mb-2 text-gray-900">{title}</h3>
-      <p className="text-gray-600">{description}</p>
-    </div>
-  );
-}
-
-function StepCard({
-  number,
-  icon,
-  title,
-  description,
-}: {
-  number: string;
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 text-center relative">
-      <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center font-bold">
-        {number}
-      </div>
-      <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary-50 text-primary-600 mb-4 mt-2">
-        {icon}
-      </div>
-      <h3 className="text-lg font-semibold mb-2 text-gray-900">{title}</h3>
-      <p className="text-gray-600 text-sm">{description}</p>
-    </div>
-  );
-}
-
-function ZoneCard({
-  zone,
-  cities,
-  fee,
-  freeFrom,
-  color,
-}: {
-  zone: string;
-  cities: string[];
-  fee: string;
-  freeFrom: string;
-  color: 'primary' | 'secondary' | 'gray';
-}) {
-  const colorClasses = {
-    primary: 'bg-primary-50 border-primary-200',
-    secondary: 'bg-secondary-50 border-secondary-200',
-    gray: 'bg-gray-50 border-gray-200',
-  };
+  const [imageError, setImageError] = useState(false);
 
   return (
-    <div className={`p-6 rounded-xl border-2 ${colorClasses[color]}`}>
-      <h3 className="text-xl font-bold mb-3">{zone}</h3>
-      <p className="text-gray-600 mb-4">{cities.join(', ')}</p>
-      <div className="flex justify-between items-center text-sm">
-        <span className="text-gray-500">Frais de livraison:</span>
-        <span className="font-semibold">{fee}</span>
-      </div>
-      <div className="flex justify-between items-center text-sm mt-1">
-        <span className="text-gray-500">Gratuit a partir de:</span>
-        <span className="font-semibold text-primary-600">{freeFrom}</span>
+    <div className="bg-white rounded-xl shadow-sm overflow-hidden group hover:shadow-lg transition">
+      <Link href={`/products/${product.id}`} className="block relative aspect-square">
+        {product.images[0] && !imageError ? (
+          <img
+            src={product.images[0]}
+            alt={product.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <div className="w-full h-full bg-brand-cream flex items-center justify-center">
+            <span className="text-5xl">{CATEGORY_ICONS[product.category] || '📦'}</span>
+          </div>
+        )}
+      </Link>
+      <div className="p-4">
+        <Link
+          href={`/farms/${product.farm.slug}`}
+          className="text-xs text-brand-green hover:text-brand-green-dark font-medium"
+        >
+          {product.farm.name}
+        </Link>
+        <Link href={`/products/${product.id}`}>
+          <h3 className="font-medium text-brand-brown text-sm line-clamp-2 mt-1 hover:text-brand-green transition">
+            {product.name}
+          </h3>
+        </Link>
+        <div className="flex items-center justify-between mt-3">
+          <span className="font-bold text-brand-green">
+            {Number(product.price).toFixed(2)} TND
+          </span>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              onAddToCart();
+            }}
+            className="p-2 bg-brand-green text-white rounded-full hover:bg-brand-green-dark transition"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
